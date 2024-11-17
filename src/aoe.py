@@ -50,6 +50,7 @@ class Match:
     description: str
     startgametime: int
     completiontime: int
+    insights_link: str
     members: List[Member]
 
 
@@ -115,6 +116,7 @@ class WorldsEdgeApiClient:
                     description=match['description'],
                     startgametime=match['startgametime'],
                     completiontime=match['completiontime'],
+                    insights_link=f'https://www.aoe2insights.com/match/{match['id']}/'
                     members=matchMembers,
                 )
                 parsedMatches.append(parsedMatch)

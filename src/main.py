@@ -108,6 +108,10 @@ class Engine:
         teams = match.teams
         header = "Match results."
 
+        ladder = self.ladder_description(match.match.matchtype_id)
+        if ladder is not None and 'ranked' in ladder.lower():
+            title = "Ranked "
+
         # prefix with result only when 2 teams are playing
         if len(teams) == 2:
             # is the clan successful ?
@@ -165,13 +169,12 @@ class Engine:
         # add match info
         title += f" on {match.match.mapname.split('.')[0].capitalize()}"
 
-        ladder = self.ladder_description(match.match.matchtype_id)
-        if ladder is not None:
-            desc += f"\n\nGame: **{ladder}**"
+        # add match insights URL
+        desc += f"\n:chart_with_upwards_trend:: **[Link to match insights]({match.match.insights_link})**"
 
         logging.info("Looking for a valid record link")
         if len(match.match.members) > 0:
-            desc += f"\nReplay: **[Download]({match.match.members[0].replay_link})**"
+            desc += f"\n:arrow_forward:: **[Download replay]({match.match.members[0].replay_link})**"
 
         return {
             "content": header,
