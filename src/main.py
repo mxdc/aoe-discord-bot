@@ -169,10 +169,9 @@ class Engine:
         if ladder is not None:
             desc += f"\n\nGame: **{ladder}**"
 
-        # find replay link
         logging.info("Looking for a valid record link")
-        if match.match.replay:
-            desc += f"\nReplay: **[Download]({match.match.replay})**"
+        if len(match.match.members) > 0:
+            desc += f"\nReplay: **[Download]({match.match.members[0].replay_link})**"
 
         return {
             "content": header,

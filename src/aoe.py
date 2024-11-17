@@ -37,6 +37,7 @@ class Member:
     oldrating: int
     outcome: int
     teamid: int
+    replay_link: str
 
 
 @dataclass
@@ -49,7 +50,6 @@ class Match:
     description: str
     startgametime: int
     completiontime: int
-    replay: Optional[str]
     members: List[Member]
 
 
@@ -102,7 +102,8 @@ class WorldsEdgeApiClient:
                         teamid=member['teamid'],
                         outcome=member['outcome'],
                         oldrating=member['oldrating'],
-                        newrating=member['newrating']
+                        newrating=member['newrating'],
+                        replay_link=self.get_replay(match['id'], member['profile_id']),
                     )
                     for member in match['matchhistorymember']
                 ]
@@ -115,7 +116,6 @@ class WorldsEdgeApiClient:
                     startgametime=match['startgametime'],
                     completiontime=match['completiontime'],
                     members=matchMembers,
-                    replay=self.get_replay(match['matchurls']),
                 )
                 parsedMatches.append(parsedMatch)
 
@@ -153,8 +153,8 @@ class WorldsEdgeApiClient:
 
         return filtered_profiles[0]
 
-    def get_replay(self, match_urls: List[object]) -> None:
-        """Extract the replay link."""
-        if len(match_urls) == 0: return None
+    def get_replay(self, match_id: int, profile_id: int) -> None:
+        """Generates the replay link."""
+        record_link = f'https://aoe.ms/replay/?gameId={match_id}&profileId={profile_id}'
 
-        return match_urls[0]['url']
+        return record_link
