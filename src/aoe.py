@@ -109,14 +109,15 @@ class WorldsEdgeApiClient:
                     for member in match['matchhistorymember']
                 ]
 
+                game_id = match['id']
                 parsedMatch = Match(
-                    id=match['id'],
+                    id=game_id,
                     mapname=match['mapname'],
                     matchtype_id=match['matchtype_id'],
                     description=match['description'],
                     startgametime=match['startgametime'],
                     completiontime=match['completiontime'],
-                    insights_link=f'https://www.aoe2insights.com/match/{match['id']}/'
+                    insights_link=f'https://www.aoe2insights.com/match/{game_id}/',
                     members=matchMembers,
                 )
                 parsedMatches.append(parsedMatch)
