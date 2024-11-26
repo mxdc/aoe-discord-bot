@@ -170,11 +170,11 @@ class Engine:
         title += f" on {match.match.mapname.split('.')[0].capitalize()}"
 
         # add match insights URL
-        desc += f"\n:chart_with_upwards_trend:: **[Link to match insights]({match.match.insights_link})**"
+        desc += f"\n\n▸ **[Link to match insights]({match.match.insights_link})**"
 
         logging.info("Looking for a valid record link")
         if len(match.match.members) > 0:
-            desc += f"\n:arrow_forward:: **[Download replay]({match.match.members[0].replay_link})**"
+            desc += f"\n▸ **[Download replay]({match.match.members[0].replay_link})**"
 
         return {
             "content": header,
