@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 # Third Party
-import requests
+from discord import SyncWebhook, Embed
 import yaml
 from aoe import WorldsEdgeApiClient, ConfigPlayer, Match, Member
 
@@ -48,28 +48,188 @@ class TeamMatch:
         return s
 
 
-@dataclass
-class Discord:
-    """The Discord client."""
+class MessageFormatter:
+    """The discord message formatter."""
 
-    url: str
+    def __init__(self, match: TeamMatch, clan_players: List[ConfigPlayer]) -> None:
+        """Init actions."""
+        # set required data
+        self.teammates = self.extract_clan_teammates(match, clan_players)
+        self.is_ranked = self.is_ranked_game(match.match.matchtype_id)
+        self.is_training = self.is_training_game(match.teams, self.teammates, match.match.members)
+        self.is_victory = self.clan_is_winner(self.teammates, self.is_training)
 
-    def post_message(self, data: dict) -> None:
-        time.sleep(5)
+        self.teams = match.teams
+
+        # format data
+        self.color = self.set_color(self.is_training, self.is_victory)
+        self.title = self.set_title(match.teams, match.match.mapname, self.is_ranked)
+        self.insights_link = self.set_insights_link(match.match.insights_link)
+        self.record_link = self.set_record_link(match.match.members)
+
+    def generate_message(self) -> str:
+        """Format the header message above the discord embed."""
+        # ensure this is not an internal clan match for training
+        if self.is_training:
+            return "Match results."
+
+        header = ""
+        for n, m in enumerate(self.teammates):
+            header += f"{m.profile.alias.capitalize()}"
+            if n < len(self.teammates) - 2:
+                header += ", "
+            elif n < len(self.teammates) - 1:
+                header += " and "
+
+        # format title according to the result
+        if self.is_victory is True:
+            header += f" {'are' if len(self.teammates) > 1 else 'is'} victorious."
+        else:
+            header += f" {'have' if len(self.teammates) > 1 else 'has'} been defeated."
+
+        return header
+
+    def generate_embed(self) -> Embed:
+        """Generates the embed to be sent by the discord client."""
+        embed = Embed(color=self.color, title=self.title)
+        if len(self.teams) != 2:
+            self.format_multiline_desc(embed, self.teams)
+        else:
+            self.format_inline_desc(embed, self.teams)
+
+        embed.add_field(name=None, value=self.insights_link, inline=False)
+        embed.add_field(name=None, value=self.record_link, inline=False)
+
+    def format_player_name(self, member: Member) -> str:
+        """Builds the player name as a link with ELO ranking and country."""
+        name = ""
+
+        if member.profile.country:
+            name += f":flag_{member.profile.country.lower()}: "
+        else:
+            name += ":globe_with_meridians: "
+        alias = member.profile.alias
+        alias += f" ({member.oldrating})"
+        name += f"[{name}](https://www.aoe2insights.com/user/{member.profile.id}/)"
+        if member.outcome > 0:
+            name += " :crown:"
+        return name
+
+    def format_inline_desc(self, embed: Embed, teams: List[Team]) -> None:
+        """Builds the message body for a game with only two teams."""
+        for it, team in enumerate(teams):
+            name = f"Team {it+1}"
+            value = ""
+            for ip, mb in enumerate(team.members):
+                value = self.format_player_name(mb)
+                if ip < len(team.members) - 1:
+                    value += "\n"
+            embed.add_field(name=name, value=value, inline=True)
+
+    def format_multiline_desc(self, embed: Embed, teams: List[Team]) -> None:
+        """Builds the message body for a game with more than two teams."""
+        desc = ""
+
+        for it, team in enumerate(teams):
+            for ip, mb in enumerate(team.members):
+                desc += self.format_player_name(mb)
+                if ip < len(team.members) - 1:
+                    desc += ", "
+            if it < len(teams) - 1:
+                desc += "\n**Versus**\n"
+
+        embed.add_field(name=None, value=desc, inline=False)
+
+    def set_insights_link(self, link: str) -> str:
+        """Sets the link description to the AoE Insights statistics page."""
+        return f"▸ **[Link to match insights]({link})**"
+
+    def set_record_link(self, members: List[Member]) -> Optional[str]:
+        """Sets the link description to download the record file."""
+        logging.info("Looking for a valid record link")
+        if len(members) > 0:
+            return f"▸ **[Download replay]({members[0].replay_link})**"
+
+    def set_title(self, teams: List[Team], mapname: str, is_ranked: bool) -> str:
+        """Sets the title of the discord embed."""
+        title = 'Ranked' if is_ranked is True else ''
+
+        for it, team in enumerate(teams):
+            title += f"{len(team.members)}"
+            if it < len(teams) - 1:
+                title += " vs "
+
+        title += f" on {mapname.split('.')[0].capitalize()}"
+        return title
+
+    def set_color(self, is_training: bool, is_victory: bool) -> int:
+        """Sets the color of the discord embed."""
+        if self.is_training is True:
+            return 7506394 # blue
+        if self.is_victory is True:
+            return 5089895 # green
+        return 10961731 # red
+
+    def is_training_game(self, teams: List[Team], teammates: List[Member], members: List[Member]) -> bool:
+        """Determines if the game was a training."""
+        return len(teammates) == len(members) or len(teams) != 2
+
+    def extract_clan_teammates(self, match: TeamMatch, clan_players: List[ConfigPlayer]) -> List[Member]:
+        """Returns the members of the clan as a list."""
+        # prefix with result only when 2 teams are playing
+        teammates: List[Member] = []
+        if len(match.teams) == 2:
+            for mb in match.match.members:
+                for clan_player in clan_players:
+                    if mb.profile.id == clan_player.profileId:
+                        teammates.append(mb)
+        return teammates
+
+    def clan_is_winner(self, teammates: List[Member], is_training: bool) -> bool:
+        """Determines if the clan has won the game."""
+        if is_training is True:
+            logging.info("this was an internal match")
+            return False
+
+        # is the clan successful ?
+        winners = [teammate for teammate in teammates if teammate.outcome > 0]
+        if len(winners) > 0:
+            logging.info("the clan is victorious")
+            return True
+
+        logging.info("the clan has been defeated")
+        return False
+
+    def is_ranked_game(self, matchtype_id: int) -> bool:
+        """Determines if the game was ranked."""
+        Gametypes = {
+            0: 'Unranked',
+            2: 'Ranked Deathmatch',
+            6: 'Ranked Random Map 1v1',
+            7: 'Ranked Random Map 2v2',
+            8: 'Ranked Random Map 3v3',
+            9: 'Ranked Random Map 4v4',
+            26: 'Ranked Empire Wars 1v1',
+            27: 'Ranked Empire Wars 2v2',
+            28: 'Ranked Empire Wars 3v3',
+            29: 'Ranked Empire Wars 4v4',
+            120: 'Ranked Return of Rome 1v1',
+            121: 'Ranked Return of Rome Team',
+        }
+
         try:
-            resp = requests.post(self.url, json=data)
-            logging.info(f"status code: {resp.status_code}")
-        except requests.exceptions.RequestException as e:
-            logging.error(f"discord: error on request: {e}")
+            return 'ranked' in Gametypes[matchtype_id].lower()
+        except KeyError:
+            return False
 
 
 class Engine:
     """The notifier engine."""
 
-    def __init__(self, cli: WorldsEdgeApiClient, dsc: Discord, pls: List[ConfigPlayer]) -> None:
+    def __init__(self, cli: WorldsEdgeApiClient, webhook: SyncWebhook, pls: List[ConfigPlayer]) -> None:
         """Inits Actions."""
         self.cli = cli
-        self.discord = dsc
+        self.webhook = webhook
         self.players = pls
 
     def run(self) -> None:
@@ -97,115 +257,10 @@ class Engine:
             found = [p for p in prev if p.match.id == n.match.id]
             if not found:
                 logging.info(f"new finished match: {n.versus_str()}")
-                msg = self.format_message(n)
-                self.discord.post_message(msg)
-
-    def format_message(self, match: TeamMatch) -> dict:
-        """Format Discord message."""
-        title = ""
-        desc = ""
-        color = 7506394  # blue
-        teams = match.teams
-        header = "Match results."
-
-        ladder = self.ladder_description(match.match.matchtype_id)
-        if ladder is not None and 'ranked' in ladder.lower():
-            title = "Ranked "
-
-        # prefix with result only when 2 teams are playing
-        if len(teams) == 2:
-            # is the clan successful ?
-            win = False
-            teammates: List[Member] = []
-            for mb in match.match.members:
-                for clan_player in self.players:
-                    if mb.profile.id == clan_player.profileId:
-                        teammates.append(mb)
-                        if mb.outcome > 0:
-                            win = True
-
-            # ensure this is not an internal clan match for training
-            if len(teammates) <= len(match.match.members) / 2:
-                header = ""
-                for n, m in enumerate(teammates):
-                    header += f"{m.profile.alias.capitalize()}"
-                    if n < len(teammates) - 2:
-                        header += ", "
-                    elif n < len(teammates) - 1:
-                        header += " and "
-                # format title and color according to the result
-                if win is True:
-                    logging.info("the clan is victorious")
-                    header += (
-                        f" {'are' if len(teammates) > 1 else 'is'} victorious."
-                    )
-                    color = 5089895  # green
-                else:
-                    logging.info("the clan has been defeated")
-                    header += f" {'have' if len(teammates) > 1 else 'has'} been defeated."
-                    color = 10961731  # red
-            else:
-                logging.info("this was an internal match")
-
-        # build message body
-        for it, team in enumerate(teams):
-            title += f"{len(team.members)}"
-            for ip, mb in enumerate(team.members):
-                if mb.profile.country:
-                    desc += f":flag_{mb.profile.country.lower()}: "
-                else:
-                    desc += ":globe_with_meridians: "
-                name = mb.profile.alias
-                name += f" ({mb.oldrating})"
-                desc += f"[{name}](https://www.aoe2insights.com/user/{mb.profile.id}/)"
-                if mb.outcome > 0:
-                    desc += " :crown:"
-                if ip < len(team.members) - 1:
-                    desc += ", "
-            if it < len(teams) - 1:
-                title += " vs "
-                desc += "\n**Versus**\n"
-
-        # add match info
-        title += f" on {match.match.mapname.split('.')[0].capitalize()}"
-
-        # add match insights URL
-        desc += f"\n\n▸ **[Link to match insights]({match.match.insights_link})**"
-
-        logging.info("Looking for a valid record link")
-        if len(match.match.members) > 0:
-            desc += f"\n▸ **[Download replay]({match.match.members[0].replay_link})**"
-
-        return {
-            "content": header,
-            "embeds": [{
-                "title": title,
-                "description": desc,
-                "color": color
-            }]
-        }
-
-    def ladder_description(self, matchtype_id: int) -> Optional[str]:
-        """Formats the game type."""
-        Gametypes = {
-            0: 'Unranked',
-            2: 'Ranked Deathmatch',
-            6: 'Ranked Random Map 1v1',
-            7: 'Ranked Random Map 2v2',
-            8: 'Ranked Random Map 3v3',
-            9: 'Ranked Random Map 4v4',
-            26: 'Ranked Empire Wars 1v1',
-            27: 'Ranked Empire Wars 2v2',
-            28: 'Ranked Empire Wars 3v3',
-            29: 'Ranked Empire Wars 4v4',
-            120: 'Ranked Return of Rome 1v1',
-            121: 'Ranked Return of Rome Team',
-        }
-
-        try:
-            return Gametypes[matchtype_id]
-        except KeyError:
-            return None
+                formatter = MessageFormatter(match=n, clan_players=self.players)
+                message = formatter.generate_message()
+                embed = formatter.generate_embed()
+                self.webhook.send(content=message, embed=embed)
 
     def get_lastmatches(self) -> Optional[List[TeamMatch]]:
             """Get last matches and removes ongoing matches from the list."""
@@ -237,7 +292,8 @@ class Engine:
                     members=[member]
                 ))
 
-        return teams
+        sorted_teams = sorted(teams, key=lambda team: team.number)
+        return sorted_teams
 
 def main(config_file: str) -> None:
     logging.info(f"loading config file {config_file}")
@@ -259,8 +315,8 @@ def main(config_file: str) -> None:
             )
 
             cli = WorldsEdgeApiClient(url=config.worldsedge_url)
-            dsc = Discord(url=config.discord_hook)
-            engine = Engine(cli, dsc, config.players)
+            webhook = SyncWebhook.from_url(config.discord_hook)
+            engine = Engine(cli, webhook, config.players)
 
             # run the infinite loop
             logging.info("starting AoE Engine...")
