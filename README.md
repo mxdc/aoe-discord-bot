@@ -31,7 +31,7 @@ $ apt install -y python3-pip
 
 3. Install the project dependencies:
 ```
-$ pip3 install requests pyyaml
+$ pip3 install requests pyyaml discord.py
 ```
 
 4. Create the installation directory:
