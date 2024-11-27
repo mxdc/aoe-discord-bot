@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 # Third Party
+import requests
 from discord import SyncWebhook, Embed
 import yaml
 from aoe import WorldsEdgeApiClient, ConfigPlayer, Match, Member
@@ -97,8 +98,12 @@ class MessageFormatter:
         else:
             self.format_inline_desc(embed, self.teams)
 
-        embed.add_field(name=None, value=self.insights_link, inline=False)
-        embed.add_field(name=None, value=self.record_link, inline=False)
+        links = f"{self.insights_link}"
+        if self.record_link is not None:
+            links += f"\n{self.record_link}"
+        embed.add_field(name='', value=links, inline=False)
+
+        return embed
 
     def format_player_name(self, member: Member) -> str:
         """Builds the player name as a link with ELO ranking and country."""
@@ -108,9 +113,8 @@ class MessageFormatter:
             name += f":flag_{member.profile.country.lower()}: "
         else:
             name += ":globe_with_meridians: "
-        alias = member.profile.alias
-        alias += f" ({member.oldrating})"
-        name += f"[{name}](https://www.aoe2insights.com/user/{member.profile.id}/)"
+        alias = f"{member.profile.alias} ({member.oldrating})"
+        name += f"[{alias}](https://www.aoe2insights.com/user/{member.profile.id}/)"
         if member.outcome > 0:
             name += " :crown:"
         return name
@@ -121,10 +125,13 @@ class MessageFormatter:
             name = f"Team {it+1}"
             value = ""
             for ip, mb in enumerate(team.members):
-                value = self.format_player_name(mb)
+                value += self.format_player_name(mb)
                 if ip < len(team.members) - 1:
                     value += "\n"
             embed.add_field(name=name, value=value, inline=True)
+            # this is just for spacing
+            if it < len(teams) - 1:
+                embed.add_field(name='', value='', inline=True)
 
     def format_multiline_desc(self, embed: Embed, teams: List[Team]) -> None:
         """Builds the message body for a game with more than two teams."""
@@ -147,12 +154,25 @@ class MessageFormatter:
     def set_record_link(self, members: List[Member]) -> Optional[str]:
         """Sets the link description to download the record file."""
         logging.info("Looking for a valid record link")
-        if len(members) > 0:
-            return f"▸ **[Download replay]({members[0].replay_link})**"
+
+        link = ""
+        for mb in members:
+            try:
+                resp = requests.get(mb.replay_link)
+                if resp.status_code == 200:
+                    logging.info("Found a valid record link")
+                    link = mb.replay_link
+                    break
+            except requests.exceptions.RequestException as e:
+                logging.error(
+                    f"couldn't validate the replay URL {mb.replay_link}, {e}"
+                )
+        if link:
+            return f"▸ **[Download replay]({link})**"
 
     def set_title(self, teams: List[Team], mapname: str, is_ranked: bool) -> str:
         """Sets the title of the discord embed."""
-        title = 'Ranked' if is_ranked is True else ''
+        title = 'Ranked ' if is_ranked is True else ''
 
         for it, team in enumerate(teams):
             title += f"{len(team.members)}"
