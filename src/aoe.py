@@ -136,9 +136,10 @@ class WorldsEdgeApiClient:
         if pms is None:
             return None
 
-        # keep last 5 matches for each player
+        # keep last 5 most recent matches for each player
         for pm in pms:
-            matches += pm.matches[:5]
+            sorted_matches = sorted(pm.matches, key=lambda match: match.startgametime, reverse=True)
+            matches += sorted_matches[:5]
 
         # remove duplicates
         for match in matches:
