@@ -12,7 +12,7 @@ class ConfigPlayer:
 
     name: Optional[str] = None
     profileId: Optional[int] = None
-    steamId: Optional[str] = None
+    steamId: Optional[int] = None
 
 
 @dataclass

@@ -327,8 +327,8 @@ def main(config_file: str) -> None:
                 players=[
                     ConfigPlayer(
                         name=pl["name"],
-                        steamId=pl["steamId"],
-                        profileId=pl["profileId"],
+                        steamId=int(pl["steamId"]),
+                        profileId=int(pl["profileId"]),
                     )
                     for pl in data["players"]
                 ],
