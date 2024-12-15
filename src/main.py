@@ -172,14 +172,14 @@ class MessageFormatter:
 
     def set_title(self, teams: List[Team], mapname: str, is_ranked: bool) -> str:
         """Sets the title of the discord embed."""
-        title = 'Ranked ' if is_ranked is True else ''
+        title = 'Ranked ' if is_ranked is True else 'Unranked '
 
         for it, team in enumerate(teams):
             title += f"{len(team.members)}"
             if it < len(teams) - 1:
                 title += " vs "
 
-        title += f" on {mapname.split('.')[0].capitalize()}"
+        # title += f" on {mapname.split('.')[0].capitalize()}"
         return title
 
     def set_color(self, is_training: bool, is_victory: bool) -> int:
