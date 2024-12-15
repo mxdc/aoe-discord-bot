@@ -122,13 +122,12 @@ class MessageFormatter:
     def format_inline_desc(self, embed: Embed, teams: List[Team]) -> None:
         """Builds the message body for a game with only two teams."""
         for it, team in enumerate(teams):
-            name = f"Team {it+1}"
-            value = ""
+            value = f"*Team {it+1}*\n"
             for ip, mb in enumerate(team.members):
                 value += self.format_player_name(mb)
                 if ip < len(team.members) - 1:
                     value += "\n"
-            embed.add_field(name=name, value=value, inline=True)
+            embed.add_field(name='', value=value, inline=True)
             # this is just for spacing
             if it < len(teams) - 1:
                 embed.add_field(name='', value='', inline=True)
