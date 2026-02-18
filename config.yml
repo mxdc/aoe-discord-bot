@@ -1,0 +1,11 @@
+---
+
+worldsedge_url: "https://aoe-api.worldsedgelink.com"
+discord_hook: "https://discord.com/api/webhooks/your/token"
+players:
+- name: "TheViper"
+  steamId: "76561197984749679"
+  profileId: 196240
+- name: "Hera"
+  steamId: "76561198449406083"
+  profileId: 199325
