@@ -8,6 +8,8 @@ The goal of this project is to keep your community informed about your successes
 
 Example:
 
+<img width="421" height="239" alt="aoe2-notif" src="https://github.com/user-attachments/assets/6ce1e747-a632-4878-b150-1c2570accc9c" />
+
 > The bot collects game data from World's Edge public API.
 
 ### Requirements
