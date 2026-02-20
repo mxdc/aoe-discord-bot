@@ -98,10 +98,13 @@ class MessageFormatter:
         else:
             self.format_inline_desc(embed, self.teams)
 
-        links = f"{self.insights_link}"
+        links = []
+        if self.insights_link is not None:
+            links.append(self.insights_link)
         if self.record_link is not None:
-            links += f"\n{self.record_link}"
-        embed.add_field(name='', value=links, inline=False)
+            links.append(self.record_link)
+        if len(links) > 0:
+            embed.add_field(name='', value="\n".join(links), inline=False)
 
         return embed
 
@@ -121,10 +124,25 @@ class MessageFormatter:
 
     def format_inline_desc(self, embed: Embed, teams: List[Team]) -> None:
         """Builds the message body for a game with only two teams."""
+        if len(teams) != 2:
+            logging.error("format_inline_desc should only be used for 2 teams")
+            return
+
+        team1 = teams[0]
+        team2 = teams[1]
+        # 1v1 case, format as "Player1 vs Player2"
+        if len(team1.members) == 1 and len(team2.members) == 1:
+            player1 = self.format_player_name(team1.members[0])
+            player2 = self.format_player_name(team2.members[0])
+            value = f"**{player1}**\u00A0\u00A0*vs*\u00A0\u00A0**{player2}**"
+            embed.add_field(name='', value=value, inline=False)
+            return
+
+        # format teams as columns
         for it, team in enumerate(teams):
             value = f"*Team {it+1}*\n"
             for ip, mb in enumerate(team.members):
-                value += self.format_player_name(mb)
+                value += f"**{self.format_player_name(mb)}**"
                 if ip < len(team.members) - 1:
                     value += "\n"
             embed.add_field(name='', value=value, inline=True)
@@ -138,17 +156,29 @@ class MessageFormatter:
 
         for it, team in enumerate(teams):
             for ip, mb in enumerate(team.members):
-                desc += self.format_player_name(mb)
+                desc += f"**{self.format_player_name(mb)}**"
                 if ip < len(team.members) - 1:
                     desc += ", "
             if it < len(teams) - 1:
-                desc += "\n**Versus**\n"
+                desc += "\n*Versus*\n"
 
         embed.add_field(name=None, value=desc, inline=False)
 
-    def set_insights_link(self, link: str) -> str:
+    def set_insights_link(self, link: str) -> Optional[str]:
         """Sets the link description to the AoE Insights statistics page."""
-        return f"▸ **[Link to match insights]({link})**"
+        logging.info("Check match link validity")
+        valid_link = False
+
+        try:
+            resp = requests.get(link)
+            if resp.status_code == 200:
+                logging.info("Valid match link")
+                valid_link = True
+        except requests.exceptions.RequestException as e:
+            logging.error("Match details not available on AoE Insights yet")
+
+        if valid_link:
+            return f"▸ **[View match details]({link})**"
 
     def set_record_link(self, members: List[Member]) -> Optional[str]:
         """Sets the link description to download the record file."""
@@ -186,8 +216,8 @@ class MessageFormatter:
         if self.is_training is True:
             return 7506394 # blue
         if self.is_victory is True:
-            return 5089895 # green
-        return 10961731 # red
+            return 3066993 # green
+        return 15158332 # red
 
     def is_training_game(self, teams: List[Team], teammates: List[Member], members: List[Member]) -> bool:
         """Determines if the game was a training."""
