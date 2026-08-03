@@ -1,0 +1,32 @@
+# Discord Bot Translation Keys
+
+# Match result messages
+match_results: "Match results."
+
+# Victory/Defeat messages
+victory_plural: "{players} are victorious."
+victory_singular: "{player} is victorious."
+defeat_plural: "{players} have been defeated."
+defeat_singular: "{player} has been defeated."
+
+# Player list formatting
+players_separator: ", "
+players_last_separator: " and "
+
+# Match details
+versus_short: "vs"
+versus_long: "*Versus*"
+team_label: "*Team {number}*"
+
+# Match type labels
+ranked: "Ranked "
+unranked: "Unranked "
+
+# Links
+view_match_details: "▸ **[View match details]({link})**"
+download_replay: "▸ **[Download replay]({link})**"
+
+# Emojis
+emoji_crown: ":crown:"
+emoji_flag: ":flag_{country}:"
+emoji_globe: ":globe_with_meridians:"

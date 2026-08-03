@@ -3,7 +3,7 @@ import logging
 import time
 from argparse import ArgumentParser
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 # Third Party
 import requests
@@ -19,6 +19,42 @@ class Config:
     worldsedge_url: str
     discord_hook: str
     players: List[ConfigPlayer]
+
+
+@dataclass
+class Translations:
+    """Typed translations for Discord messages."""
+
+    # Match result messages
+    match_results: str
+
+    # Victory/Defeat messages
+    victory_plural: str
+    victory_singular: str
+    defeat_plural: str
+    defeat_singular: str
+
+    # Player list formatting
+    players_separator: str
+    players_last_separator: str
+
+    # Match details
+    versus_short: str
+    versus_long: str
+    team_label: str
+
+    # Match type labels
+    ranked: str
+    unranked: str
+
+    # Links
+    view_match_details: str
+    download_replay: str
+
+    # Emojis
+    emoji_crown: str
+    emoji_flag: str
+    emoji_globe: str
 
 
 @dataclass
@@ -52,9 +88,10 @@ class TeamMatch:
 class MessageFormatter:
     """The discord message formatter."""
 
-    def __init__(self, match: TeamMatch, clan_players: List[ConfigPlayer]) -> None:
+    def __init__(self, match: TeamMatch, clan_players: List[ConfigPlayer], translations: Translations) -> None:
         """Init actions."""
         # set required data
+        self.text = translations
         self.teammates = self.extract_clan_teammates(match, clan_players)
         self.is_ranked = self.is_ranked_game(match.match.matchtype_id)
         self.is_training = self.is_training_game(match.teams, self.teammates, match.match.members)
@@ -72,23 +109,25 @@ class MessageFormatter:
         """Format the header message above the discord embed."""
         # ensure this is not an internal clan match for training
         if self.is_training:
-            return "Match results."
+            return self.text.match_results
 
         header = ""
         for n, m in enumerate(self.teammates):
             header += f"{m.profile.alias.capitalize()}"
             if n < len(self.teammates) - 2:
-                header += ", "
+                header += self.text.players_separator
             elif n < len(self.teammates) - 1:
-                header += " and "
+                header += self.text.players_last_separator
 
         # format title according to the result
         if self.is_victory is True:
-            header += f" {'are' if len(self.teammates) > 1 else 'is'} victorious."
+            if len(self.teammates) > 1:
+                return self.text.victory_plural.format(players=header)
+            return self.text.victory_singular.format(player=header)
         else:
-            header += f" {'have' if len(self.teammates) > 1 else 'has'} been defeated."
-
-        return header
+            if len(self.teammates) > 1:
+                return self.text.defeat_plural.format(players=header)
+            return self.text.defeat_singular.format(player=header)
 
     def generate_embed(self) -> Embed:
         """Generates the embed to be sent by the discord client."""
@@ -113,13 +152,14 @@ class MessageFormatter:
         name = ""
 
         if member.profile.country:
-            name += f":flag_{member.profile.country.lower()}: "
+            name += self.text.emoji_flag.format(country=member.profile.country.lower())
         else:
-            name += ":globe_with_meridians: "
+            name += self.text.emoji_globe
+        name += " "
         alias = f"{member.profile.alias} ({member.oldrating})"
         name += f"[{alias}](https://www.aoe2insights.com/user/{member.profile.id}/)"
         if member.outcome > 0:
-            name += " :crown:"
+            name += " " + self.text.emoji_crown
         return name
 
     def format_inline_desc(self, embed: Embed, teams: List[Team]) -> None:
@@ -134,13 +174,14 @@ class MessageFormatter:
         if len(team1.members) == 1 and len(team2.members) == 1:
             player1 = self.format_player_name(team1.members[0])
             player2 = self.format_player_name(team2.members[0])
-            value = f"**{player1}**\u00A0\u00A0*vs*\u00A0\u00A0**{player2}**"
+            vs_text = f"*{self.text.versus_short}*"
+            value = f"**{player1}**\u00A0\u00A0{vs_text}\u00A0\u00A0**{player2}**"
             embed.add_field(name='', value=value, inline=False)
             return
 
         # format teams as columns
         for it, team in enumerate(teams):
-            value = f"*Team {it+1}*\n"
+            value = self.text.team_label.format(number=it+1) + "\n"
             for ip, mb in enumerate(team.members):
                 value += f"**{self.format_player_name(mb)}**"
                 if ip < len(team.members) - 1:
@@ -158,9 +199,9 @@ class MessageFormatter:
             for ip, mb in enumerate(team.members):
                 desc += f"**{self.format_player_name(mb)}**"
                 if ip < len(team.members) - 1:
-                    desc += ", "
+                    desc += self.text.players_separator
             if it < len(teams) - 1:
-                desc += "\n*Versus*\n"
+                desc += "\n" + self.text.versus_long + "\n"
 
         embed.add_field(name=None, value=desc, inline=False)
 
@@ -178,7 +219,7 @@ class MessageFormatter:
             logging.error("Match details not available on AoE Insights yet")
 
         if valid_link:
-            return f"▸ **[View match details]({link})**"
+            return self.text.view_match_details.format(link=link)
 
     def set_record_link(self, members: List[Member]) -> Optional[str]:
         """Sets the link description to download the record file."""
@@ -197,16 +238,16 @@ class MessageFormatter:
                     f"couldn't validate the replay URL {mb.replay_link}, {e}"
                 )
         if link:
-            return f"▸ **[Download replay]({link})**"
+            return self.text.download_replay.format(link=link)
 
     def set_title(self, teams: List[Team], mapname: str, is_ranked: bool) -> str:
         """Sets the title of the discord embed."""
-        title = 'Ranked ' if is_ranked is True else 'Unranked '
+        title = self.text.ranked if is_ranked is True else self.text.unranked
 
         for it, team in enumerate(teams):
             title += f"{len(team.members)}"
             if it < len(teams) - 1:
-                title += " vs "
+                title += f" {self.text.versus_short} "
 
         # title += f" on {mapname.split('.')[0].capitalize()}"
         return title
@@ -275,11 +316,12 @@ class MessageFormatter:
 class Engine:
     """The notifier engine."""
 
-    def __init__(self, cli: WorldsEdgeApiClient, webhook: SyncWebhook, pls: List[ConfigPlayer]) -> None:
+    def __init__(self, cli: WorldsEdgeApiClient, webhook: SyncWebhook, pls: List[ConfigPlayer], translations: Translations) -> None:
         """Inits Actions."""
         self.cli = cli
         self.webhook = webhook
         self.players = pls
+        self.text = translations
 
     def run(self) -> None:
         """Starts the infinite loop."""
@@ -306,7 +348,7 @@ class Engine:
             found = [p for p in prev if p.match.id == n.match.id]
             if not found:
                 logging.info(f"new finished match: {n.versus_str()}")
-                formatter = MessageFormatter(match=n, clan_players=self.players)
+                formatter = MessageFormatter(match=n, clan_players=self.players, translations=self.text)
                 message = formatter.generate_message()
                 embed = formatter.generate_embed()
                 self.webhook.send(content=message, embed=embed)
@@ -344,10 +386,11 @@ class Engine:
         sorted_teams = sorted(teams, key=lambda team: team.number)
         return sorted_teams
 
-def main(config_file: str) -> None:
+def main(config_file: str, translations_file: str) -> None:
     logging.info(f"loading config file {config_file}")
 
     try:
+        # Load config
         with open(config_file, "r") as stream:
             data = yaml.safe_load(stream)
             config = Config(
@@ -363,14 +406,20 @@ def main(config_file: str) -> None:
                 ],
             )
 
-            cli = WorldsEdgeApiClient(url=config.worldsedge_url)
-            webhook = SyncWebhook.from_url(config.discord_hook)
-            engine = Engine(cli, webhook, config.players)
+        # Load translations
+        logging.info(f"loading translations file {translations_file}")
+        with open(translations_file, "r") as stream:
+            translations_data = yaml.safe_load(stream)
+            translations = Translations(**translations_data)
 
-            # run the infinite loop
-            logging.info("starting AoE Engine...")
-            engine.run()
-            logging.info("exiting...")
+        cli = WorldsEdgeApiClient(url=config.worldsedge_url)
+        webhook = SyncWebhook.from_url(config.discord_hook)
+        engine = Engine(cli, webhook, config.players, translations)
+
+        # run the infinite loop
+        logging.info("starting AoE Engine...")
+        engine.run()
+        logging.info("exiting...")
 
     except Exception as exc:
         logging.error(exc)
@@ -382,7 +431,8 @@ if __name__ == "__main__":
     # parse arguments
     parser = ArgumentParser()
     parser.add_argument("--config-file", type=str, help="Path to config file.")
+    parser.add_argument("--translations-file", type=str, help="Path to translations file.")
     args = parser.parse_args()
 
     # start
-    main(args.config_file)
+    main(args.config_file, args.translations_file)
