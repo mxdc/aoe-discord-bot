@@ -64,7 +64,7 @@ players:
 
 2. Start the service:
 ```
-$ python3.8 /etc/aoe/main.py --config-file="/etc/aoe/config.yml"
+$ python3.8 /etc/aoe/main.py --config-file="/etc/aoe/config.yml" --translations-file="/etc/aoe/en.yml"
 ```
 
 ### As daemon
@@ -79,7 +79,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=python3 /etc/aoe/main.py --config-file="/etc/aoe/config.yml"
+ExecStart=python3 /etc/aoe/main.py --config-file="/etc/aoe/config.yml" --translations-file="/etc/aoe/en.yml"
 Restart=always
 RestartSec=10
 
