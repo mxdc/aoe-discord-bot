@@ -3,7 +3,7 @@ import logging
 import time
 from argparse import ArgumentParser
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 # Third Party
 import requests
@@ -215,7 +215,7 @@ class MessageFormatter:
             if resp.status_code == 200:
                 logging.info("Valid match link")
                 valid_link = True
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             logging.error("Match details not available on AoE Insights yet")
 
         if valid_link:
@@ -327,7 +327,7 @@ class Engine:
         """Starts the infinite loop."""
         prev = self.get_lastmatches()
         if prev is None:
-            logging.error("could't initialize matches")
+            logging.error("couldn't initialize matches")
             return
 
         logging.info("recent matches initialized")
@@ -335,7 +335,7 @@ class Engine:
             time.sleep(50)
             new = self.get_lastmatches()
             if new is None:
-                logging.error("could't refresh matches")
+                logging.error("couldn't refresh matches")
                 continue
 
             self.check_results(prev, new)
@@ -354,16 +354,18 @@ class Engine:
                 self.webhook.send(content=message, embed=embed)
 
     def get_lastmatches(self) -> Optional[List[TeamMatch]]:
-            """Get last matches and removes ongoing matches from the list."""
-            team_matches = []
+        """Get last matches and removes ongoing matches from the list."""
+        team_matches = []
 
-            matches = self.cli.get_lastmatches(self.players)
+        matches = self.cli.get_lastmatches(self.players)
+        if matches is None:
+            return None
 
-            for match in matches:
-                teams = self.set_teams(match.members)
-                team_matches.append(TeamMatch(match=match, teams=teams))
+        for match in matches:
+            teams = self.set_teams(match.members)
+            team_matches.append(TeamMatch(match=match, teams=teams))
 
-            return team_matches
+        return team_matches
 
     def set_teams(self, members: List[Member]) -> List[Team]:
         teams: list[Team] = []

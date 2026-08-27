@@ -157,7 +157,7 @@ class WorldsEdgeApiClient:
 
         return filtered_profiles[0]
 
-    def get_replay(self, match_id: int, profile_id: int) -> None:
+    def get_replay(self, match_id: int, profile_id: int) -> str:
         """Generates the replay link."""
         record_link = f'https://aoe.ms/replay/?gameId={match_id}&profileId={profile_id}'
 
