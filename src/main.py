@@ -203,7 +203,7 @@ class MessageFormatter:
             if it < len(teams) - 1:
                 desc += "\n" + self.text.versus_long + "\n"
 
-        embed.add_field(name=None, value=desc, inline=False)
+        embed.add_field(name='', value=desc, inline=False)
 
     def set_insights_link(self, link: str) -> Optional[str]:
         """Sets the link description to the AoE Insights statistics page."""
