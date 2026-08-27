@@ -43,7 +43,13 @@ $ mkdir /etc/aoe
 ```
 $ ls -1 /etc/aoe/
 aoe.py
+config.py
+engine.py
+link_resolver.py
 main.py
+match_classifier.py
+message_formatter.py
+models.py
 ```
 
 ### Usage
@@ -97,3 +103,15 @@ $ systemctl start aoe.service
 ```
 $ journalctl -u aoe.service -f
 ```
+
+### Development
+
+Install the dev dependencies and run the test suite:
+```
+$ pip3 install -r requirements-dev.txt
+$ python3 -m pytest
+```
+
+The test suite covers `match_classifier.py` and `message_formatter.py`, the two modules with no
+network or Discord I/O. There are no tests for the World's Edge client or the Discord webhook
+send path, since those need live credentials to exercise meaningfully.
