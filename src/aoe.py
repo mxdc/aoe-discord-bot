@@ -1,83 +1,36 @@
 # Standard Library
 import logging
-from dataclasses import dataclass
 from typing import List, Optional
 
 # Third Party
 import requests
 
-@dataclass
-class ConfigPlayer:
-    """Represents the player in the config file."""
+from models import ConfigPlayer, Match, Member, PlayerMatches, Profile
 
-    name: Optional[str] = None
-    profileId: Optional[int] = None
-    steamId: Optional[int] = None
-
-
-@dataclass
-class Profile:
-    """Represents the profile."""
-
-    id: int
-    name: str
-    alias: str
-    personal_statgroup_id: int
-    xp: int
-    country: str
-
-
-@dataclass
-class Member:
-    """Represents the player in a match."""
-
-    profile: Optional[Profile]
-    civilization_id: int
-    newrating: int
-    oldrating: int
-    outcome: int
-    teamid: int
-    replay_link: str
-
-
-@dataclass
-class Match:
-    """Represents the match."""
-
-    id: int
-    mapname: str
-    matchtype_id: int
-    description: str
-    startgametime: int
-    completiontime: int
-    insights_link: str
-    members: List[Member]
-
-
-@dataclass
-class PlayerMatches:
-    """Private class that combines the player with his recent matches."""
-
-    matches: List[Match]
-    steam_id: str
+logger = logging.getLogger(__name__)
 
 
 class WorldsEdgeApiClient:
     """The HTTP client for World's Edge."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, session: requests.Session, timeout: float = 10) -> None:
         self.url = url
+        self.session = session
+        self.timeout = timeout
 
     def get_matches(self, players: List[ConfigPlayer]) -> Optional[List[PlayerMatches]]:
         """Performs the HTTP requests."""
         pms: List[PlayerMatches] = []
 
         for pl in players:
-            logging.info(f"getting {pl.name} (id: {pl.steamId}) matches...")
+            logger.info(f"getting {pl.name} (id: {pl.steamId}) matches...")
 
-            resp = requests.get(f'{self.url}/community/leaderboard/getRecentMatchHistory?title=age2&profile_names=[%22/steam/{pl.steamId}%22]')
+            resp = self.session.get(
+                f'{self.url}/community/leaderboard/getRecentMatchHistory?title=age2&profile_names=[%22/steam/{pl.steamId}%22]',
+                timeout=self.timeout,
+            )
             if resp.status_code != 200:
-                logging.error(f"HTTP request error with status: {resp.status_code}")
+                logger.error(f"HTTP request error with status: {resp.status_code}")
                 return None
 
             data = resp.json()
@@ -124,7 +77,7 @@ class WorldsEdgeApiClient:
 
             pms.append(PlayerMatches(steam_id=pl.steamId, matches=parsedMatches))
 
-        logging.info(f"found matches for {len(pms)}/{len(players)} players")
+        logger.info(f"found matches for {len(pms)}/{len(players)} players")
         return pms
 
     def get_lastmatches(self, players: List[ConfigPlayer]) -> Optional[List[Match]]:
